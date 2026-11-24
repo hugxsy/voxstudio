@@ -244,6 +244,7 @@ void VoiceEngine::renderThread(std::wstring id, Ring* ring, bool isMonitor) {
         if (SUCCEEDED(rc->GetBuffer(bufFrames, &d))) rc->ReleaseBuffer(bufFrames, AUDCLNT_BUFFERFLAGS_SILENT);
         client->Start();
         std::vector<float> tmp;
+        float gCur = 0.0f;
         const size_t target = 480;          // 10 ms de marge
         const size_t maxFill = target + 1920; // au-delà, on rattrape le retard
         while (!stopFlag_) {
@@ -262,12 +263,14 @@ void VoiceEngine::renderThread(std::wstring id, Ring* ring, bool isMonitor) {
             tmp.assign(avail, 0.0f);
             size_t got = ring->pop(tmp.data(), avail);
             (void)got;
-            float g = 1.0f;
-            if (isMonitor) g = monitorOn ? monitorVolume.load() : 0.0f;
+            float gTarget = isMonitor ? (monitorOn ? monitorVolume.load() : 0.0f) : 1.0f;
+            if (!isMonitor) gCur = 1.0f;
             if (FAILED(rc->GetBuffer(avail, &d))) continue;
             float* out = reinterpret_cast<float*>(d);
-            for (UINT32 i = 0; i < avail; ++i)
-                for (int c = 0; c < chans; ++c) out[(size_t)i * chans + c] = (c < 2) ? tmp[i] * g : 0.0f;
+            for (UINT32 i = 0; i < avail; ++i) {
+                gCur += (gTarget - gCur) * 0.002f;   // fondu ~10 ms : pas de clic quand on coupe le retour
+                for (int c = 0; c < chans; ++c) out[(size_t)i * chans + c] = (c < 2) ? tmp[i] * gCur : 0.0f;
+            }
             rc->ReleaseBuffer(avail, 0);
             if (!isMonitor) latencyMs_ = (float)(ring->size() + pad) / 48.0f + 10.0f;
         }

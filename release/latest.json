@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio.exe",
-  "notes": "Mises à jour automatiques intégrées. Design noir et orange, anti-bruit IA, niveleur, effets voix, diffusion sur plusieurs sorties."
+  "notes": "Nouveau logo. Bouton « Retour casque » dans la barre latérale pour couper ta voix dans le casque sans toucher aux autres sons, avec un fondu sans clic."
 }

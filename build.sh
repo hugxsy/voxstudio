@@ -3,8 +3,6 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p build/obj
-[ -d third_party/imgui ] || git clone -q --depth 1 --branch v1.91.5 https://github.com/ocornut/imgui.git third_party/imgui
-[ -d third_party/rnnoise ] || { git clone -q https://github.com/xiph/rnnoise.git third_party/rnnoise && git -C third_party/rnnoise checkout -q v0.1.1; }
 IMGUI=third_party/imgui
 RN=third_party/rnnoise
 CC=x86_64-w64-mingw32-gcc
@@ -16,6 +14,7 @@ for f in imgui imgui_draw imgui_tables imgui_widgets backends/imgui_impl_win32 b
   o=build/obj/$(basename $f).o
   [ $o -nt $IMGUI/$f.cpp ] || $CXX -std=c++17 -O2 -I$IMGUI -c $IMGUI/$f.cpp -o $o
 done
+[ build/obj/app_res.o -nt res/app.ico ] || (cd res && x86_64-w64-mingw32-windres app.rc -O coff -o ../build/obj/app_res.o)
 FLAGS="-std=c++17 -O2 -DNDEBUG -DUNICODE -D_UNICODE -D_WIN32_WINNT=0x0A00 -I$IMGUI -I$IMGUI/backends -I$RN/include"
 $CXX $FLAGS -Wall -Wno-unused-function src/main.cpp src/win_audio.cpp src/updater.cpp build/obj/*.o -o build/VoxStudio.exe \
   -municode -mwindows -static -static-libgcc -static-libstdc++ \

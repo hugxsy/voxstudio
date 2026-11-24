@@ -414,7 +414,7 @@ struct App {
     }
     void startEngine() {
         engine.monitorOn = st.monitorOn; engine.monitorVolume = st.monitorVol;
-        engine.start(st.inputId, (VoiceEngine::Channel)st.channel, st.cableId, st.monitorOn ? st.monitorId : L"");
+        engine.start(st.inputId, (VoiceEngine::Channel)st.channel, st.cableId, st.monitorId);
         wantRunning = true;
     }
     void stopEngine() { engine.stop(); wantRunning = false; }
@@ -438,8 +438,10 @@ static void drawSidebar(App& a, float w) {
     float pad = S(22);
     ImGui::SetCursorPos(ImVec2(pad, S(26)));
     ImVec2 lp = ImGui::GetCursorScreenPos();
-    dl->AddCircleFilled(ImVec2(lp.x + S(7), lp.y + S(14)), S(7), U(col::orange), 24);
-    ImGui::SetCursorPosX(pad + S(22));
+    { const float hs[5] = {0.35f, 0.65f, 1.0f, 0.65f, 0.35f}; float bw = S(3), gp = S(2.2f), H = S(18), cy = lp.y + S(15);
+      for (int i = 0; i < 5; ++i) { float x = lp.x + i * (bw + gp), h = H * hs[i];
+        dl->AddRectFilled(ImVec2(x, cy - h / 2), ImVec2(x + bw, cy + h / 2), U(col::orange), bw); } }
+    ImGui::SetCursorPosX(pad + S(30));
     textCol(fHuge, col::text, "Vox Studio");
     ImGui::Dummy(ImVec2(0, S(18)));
 
@@ -460,7 +462,7 @@ static void drawSidebar(App& a, float w) {
     }
 
     // Bloc d'état en bas
-    float bh = S(250);
+    float bh = S(300);
     ImGui::SetCursorPos(ImVec2(0, ImGui::GetWindowHeight() - bh));
     bool on = a.engine.running() && !a.engine.failed();
     float d = S(84);
@@ -483,6 +485,13 @@ static void drawSidebar(App& a, float w) {
     ImGui::PopTextWrapPos();
     ImGui::PopFont();
     ImGui::Dummy(ImVec2(0, S(8)));
+    ImGui::SetCursorPosX(S(22));
+    bool mon = a.st.monitorOn;
+    if (Pill(mon ? "Je m'entends au casque" : "Retour casque coupé", mon, ImVec2(w - S(44), S(40)))) {
+        a.st.monitorOn = !mon; a.engine.monitorOn = a.st.monitorOn; a.dirty = true;
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Entendre ou non ta voix dans le casque. Les autres sons ne changent pas.");
+    ImGui::Dummy(ImVec2(0, S(2)));
     bool m = a.engine.muted;
     ImGui::SetCursorPosX(S(22));
     if (Pill(m ? "Micro coupé" : "Couper le micro", m, ImVec2(w - S(44), S(40)), &col::red)) a.engine.muted = !m;
@@ -918,7 +927,7 @@ static void drawSettings(App& a) {
     ImVec2 after = ImGui::GetCursorPos();
     ImGui::SetCursorPos(ImVec2(hp.x + w2 - S(46), hp.y + S(4)));
     bool mo = a.st.monitorOn;
-    if (Switch("##mon", &mo)) { a.st.monitorOn = mo; a.engine.monitorOn = mo; a.dirty = true; a.restartIfRunning(); }
+    if (Switch("##mon", &mo)) { a.st.monitorOn = mo; a.engine.monitorOn = mo; a.dirty = true; }
     ImGui::SetCursorPos(after);
     ImGui::Dummy(ImVec2(0, S(6)));
     ImGui::BeginDisabled(!a.st.monitorOn);
@@ -1000,7 +1009,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     ImGui_ImplWin32_EnableDpiAwareness();
 
-    WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0, 0, hInst, LoadIconW(nullptr, IDI_APPLICATION), LoadCursorW(nullptr, IDC_ARROW), nullptr, nullptr, L"VoxStudioWnd", nullptr};
+    WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0, 0, hInst, LoadIconW(hInst, MAKEINTRESOURCEW(1)), LoadCursorW(nullptr, IDC_ARROW), nullptr, nullptr, L"VoxStudioWnd", nullptr};
+    wc.hIconSm = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);
     RegisterClassExW(&wc);
     gDpi = ImGui_ImplWin32_GetDpiScaleForMonitor(MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY));
     HWND hwnd = CreateWindowW(wc.lpszClassName, L"Vox Studio", WS_OVERLAPPEDWINDOW, 80, 60, (int)S(1400), (int)S(900), nullptr, nullptr, hInst, nullptr);
