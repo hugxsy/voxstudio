@@ -15,5 +15,5 @@ Mixeur audio et traitement de la voix pour Windows, alternative simple à Voicem
 ## Publier une version
 
 1. Monter `VOX_VERSION` dans `src/updater.h`, compiler.
-2. Copier `build/VoxStudio.exe` dans `release/`, mettre à jour `release/latest.json`.
+2. Copier `build/VoxStudio.exe` dans `release/VoxStudio-X.Y.Z.exe` (un nom par version, pour éviter le cache), mettre à jour `release/latest.json`.
 3. Commit + push sur `main` : les installations existantes proposent la mise à jour.
