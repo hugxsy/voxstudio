@@ -5,7 +5,7 @@
 #include <mutex>
 #include <thread>
 
-#define VOX_VERSION "2.3.1"
+#define VOX_VERSION "2.3.2"
 // Manifeste publié dans le dépôt GitHub : release/latest.json
 #define VOX_MANIFEST_URL "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/latest.json"
 

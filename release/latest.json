@@ -1,5 +1,5 @@
 {
-  "version": "2.3.1",
-  "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio-2.3.1.exe",
-  "notes": "Corrige l'ancienne version qui restait ouverte après une mise à jour. Retour casque plus réactif (latence réduite). Les nouvelles versions sont détectées immédiatement."
+  "version": "2.3.2",
+  "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio-2.3.2.exe",
+  "notes": "Nouveau preset C214 Podcast (voix sèche, sans réverb ni écho) appliqué automatiquement. Réverb Plate ramenée à un niveau normal."
 }

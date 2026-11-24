@@ -386,7 +386,7 @@ public:
         // sortie (prises de Dattorro, canal gauche)
         auto T = [&](int k, int pos) { return tap(tk_[k], tkW_[k], (int)(pos * kFs / 29761.0f)); };
         float y = T(5, 266) + T(5, 2974) - T(6, 1913) + T(7, 1996) - T(1, 1990) - T(2, 187) - T(3, 1066);
-        return y * 0.6f;
+        return y * 0.16f;   // calé au niveau de la réverb « Pièce »
     }
 private:
     static float tap(const std::vector<float>& b, int w, int delay) {
@@ -660,9 +660,9 @@ private:
 };
 
 // ---------------------------------------------------------------- Presets
-enum class Preset { C214Radio, Naturel, Radio, Podcast, Grave, Studio, Talkie, Robot, Off, Count };
+enum class Preset { C214Podcast, Naturel, Radio, Podcast, Grave, Studio, Talkie, Robot, Off, Count };
 inline const char* presetName(int i) {
-    static const char* n[] = {"C214 Radio", "Naturel", "Radio", "Podcast", "Grave", "Studio", "Talkie", "Robot", "Sans effet"};
+    static const char* n[] = {"C214 Podcast", "Naturel", "Radio", "Podcast", "Grave", "Studio", "Talkie", "Robot", "Sans effet"};
     return (i >= 0 && i < (int)Preset::Count) ? n[i] : "Perso";
 }
 
@@ -683,16 +683,20 @@ inline void applyPreset(VoiceParams& p, Preset pr) {
     auto comp = [&](int st, float t, float r, float at, float re, float mk, float mix) {
         p.compStyle = st; p.compThreshDb = t; p.compRatio = r; p.compAttackMs = at; p.compReleaseMs = re; p.compMakeupDb = mk; p.compMix = mix; };
     switch (pr) {
-    case Preset::C214Radio:
-        // C214 : statique brillant avec bosse de présence vers 7-12 kHz, capte la pièce
-        p.hpfHz = 85; p.gateThreshDb = -52;
-        eq(3.0f, -3.5f, 0.0f, 2.0f, -0.5f);
-        p.eqF[1] = 280; p.eqQ[1] = 1.1f; p.eqF[3] = 3000; p.eqQ[3] = 1.0f; p.eqF[4] = 9000;
-        comp(CompOpto, -26, 4, 8, 120, 9, 0.85f);
-        p.mbOn = true; p.mbAmount = 0.45f;
-        p.deessFreqHz = 7000; p.deessThreshDb = -34; p.deessMaxDb = 9;
-        p.exciterAmount = 0.15f; p.satAmount = 0.25f;
-        p.reverbOn = true; p.reverbType = 1; p.reverbSize = 0.25f; p.reverbDamp = 0.7f; p.reverbMix = 0.05f;
+    case Preset::C214Podcast:
+        // Base Podcast, ajustée pour le C214 : statique brillant (bosse vers 7-12 kHz), effet de proximité,
+        // capte la pièce. Aucune réverb, aucun écho : voix sèche, proche et naturelle.
+        p.hpfHz = 80; p.gateThreshDb = -54; p.denoiseAmount = 0.85f;
+        eq(1.5f, -2.5f, 0.0f, 1.5f, -1.0f);
+        p.eqF[0] = 120; p.eqQ[0] = 0.8f;
+        p.eqF[1] = 300; p.eqQ[1] = 1.2f;
+        p.eqF[3] = 3000; p.eqQ[3] = 1.0f;
+        p.eqF[4] = 9000; p.eqQ[4] = 0.8f;
+        comp(CompVCA, -22, 3, 8, 120, 6, 1.0f);
+        p.mbOn = false;
+        p.deessFreqHz = 7000; p.deessThreshDb = -33; p.deessMaxDb = 7;
+        p.exciterAmount = 0.1f; p.satAmount = 0.12f;
+        p.reverbOn = false; p.echoOn = false;
         break;
     case Preset::Naturel:
         p.hpfHz = 80; p.gateThreshDb = -55; eq(1, -1.5f, 0, 1.5f, 1); comp(CompOpto, -20, 2.5f, 10, 120, 4, 1);

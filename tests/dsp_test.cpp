@@ -153,7 +153,7 @@ int main() {
         float early = 0, late = 0; for (size_t i = 2400; i < 12000; ++i) early = std::max(early, std::fabs(o[i]));
         for (size_t i = 84000; i < 96000; ++i) late = std::max(late, std::fabs(o[i]));
         std::printf("     plate : début %.4f, après 1,8 s %.6f\n", early, late);
-        CHECK(sane(o) && early > 0.001f && late < early * 0.05f, "réverb plate : produit une queue qui s'éteint");
+        CHECK(sane(o) && early > 0.0003f && late < early * 0.05f, "réverb plate : produit une queue qui s'éteint");
     }
     // --- compresseur : les 3 caractères réduisent la dynamique et restent stables
     for (int st = 0; st < 3; ++st) {

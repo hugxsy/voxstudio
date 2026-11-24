@@ -14,7 +14,7 @@ struct Settings {
     float monitorVol = 0.8f;
     int  preset = 1;
     int  page = 0;
-    int  version = 3;
+    int  version = 4;
     bool autoStart = true;
     bool showVirtual = false;
     std::vector<std::wstring> mirrors;   // sorties en diffusion supplémentaire

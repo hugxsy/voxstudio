@@ -1199,7 +1199,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int) {
 
     App app;
     bool had = loadSettings(app.st, app.engine.params);
-    if (!had || app.st.version < 3) { dsp::applyPreset(app.engine.params, dsp::Preset::C214Radio); app.st.preset = 0; app.st.version = 3; app.dirty = true; }
+    if (!had || app.st.version < 4) { dsp::applyPreset(app.engine.params, dsp::Preset::C214Podcast); app.st.preset = 0; app.st.version = 4; app.dirty = true; }
     app.refreshDevices();
     app.autoPick();
     app.mixer.refresh();
