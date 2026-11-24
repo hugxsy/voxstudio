@@ -231,7 +231,7 @@ void VoiceEngine::renderThread(std::wstring id, Ring* ring, bool isMonitor) {
     DWORD ti = 0; HANDLE task = AvSetMmThreadCharacteristicsW(L"Pro Audio", &ti);
     HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     std::string err; int chans = 0;
-    auto client = openClient(id, 2, 200000, ev, &chans, &err);
+    auto client = openClient(id, 2, isMonitor ? 100000 : 200000, ev, &chans, &err);   // retour casque : tampon 10 ms
     Com<IAudioRenderClient> rc;
     UINT32 bufFrames = 0;
     const char* what = isMonitor ? "Retour casque : " : "Micro virtuel : ";
@@ -245,8 +245,8 @@ void VoiceEngine::renderThread(std::wstring id, Ring* ring, bool isMonitor) {
         client->Start();
         std::vector<float> tmp;
         float gCur = 0.0f;
-        const size_t target = 480;          // 10 ms de marge
-        const size_t maxFill = target + 1920; // au-delà, on rattrape le retard
+        const size_t target = isMonitor ? 192 : 480;              // marge : 4 ms (casque) / 10 ms (micro virtuel)
+        const size_t maxFill = target + (isMonitor ? 480 : 1920);  // au-delà, on rattrape le retard
         while (!stopFlag_) {
             if (WaitForSingleObject(ev, 200) != WAIT_OBJECT_0) continue;
             UINT32 pad = 0;

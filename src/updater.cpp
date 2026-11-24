@@ -7,6 +7,7 @@
 #include <winhttp.h>
 #include <vector>
 #include <cstdio>
+#include <string>
 
 static std::wstring widen(const std::string& s) {
     int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
@@ -130,7 +131,8 @@ void Updater::run(bool install) {
     std::string err;
     if (!install) {
         std::vector<char> body;
-        if (!httpGet(VOX_MANIFEST_URL, body, err)) { std::lock_guard<std::mutex> l(mx_); error_ = err; state_ = Failed; return; }
+        std::string murl = std::string(VOX_MANIFEST_URL) + "?t=" + std::to_string(GetTickCount64()); // contourne le cache du CDN
+        if (!httpGet(murl, body, err)) { std::lock_guard<std::mutex> l(mx_); error_ = err; state_ = Failed; return; }
         std::string j(body.begin(), body.end());
         std::string tag = jsonString(j, "version"), notes = jsonString(j, "notes"), url = jsonString(j, "url");
         std::lock_guard<std::mutex> l(mx_);

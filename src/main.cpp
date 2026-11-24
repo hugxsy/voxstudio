@@ -1162,7 +1162,7 @@ static void drawUpdateCard(App& a, float cw) {
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int) {
     bool afterUpdate = cmdLine && wcsstr(cmdLine, L"--updated");
     HANDLE single = CreateMutexW(nullptr, TRUE, L"VoxStudio.SingleInstance");
-    for (int i = 0; afterUpdate && GetLastError() == ERROR_ALREADY_EXISTS && i < 60; ++i) { // l'ancienne version se ferme
+    for (int i = 0; afterUpdate && GetLastError() == ERROR_ALREADY_EXISTS && i < 100; ++i) { // l'ancienne version se ferme
         CloseHandle(single); Sleep(100);
         single = CreateMutexW(nullptr, TRUE, L"VoxStudio.SingleInstance");
     }
@@ -1236,7 +1236,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int) {
             app.mirror.stop(); app.engine.stop();
             if (single) { CloseHandle(single); single = nullptr; }
             app.updater.relaunch();
-            PostQuitMessage(0);
+            ExitProcess(0);   // fermeture immédiate : l'ancienne version ne doit plus rien traiter
         }
 
         size_t n = app.engine.readAnalysis(ana.data(), ana.size());

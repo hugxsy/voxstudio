@@ -1,5 +1,5 @@
 {
-  "version": "2.3.0",
-  "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio-2.3.0.exe",
-  "notes": "Tranche voix pro : égaliseur visuel 5 bandes, compresseur VCA / Opto / FET avec dosage parallèle, densité radio 3 bandes, réverb Plate, saturation sans aliasing, limiteur à anticipation, preset C214 Radio."
+  "version": "2.3.1",
+  "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio-2.3.1.exe",
+  "notes": "Corrige l'ancienne version qui restait ouverte après une mise à jour. Retour casque plus réactif (latence réduite). Les nouvelles versions sont détectées immédiatement."
 }
