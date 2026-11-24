@@ -14,7 +14,7 @@ struct Settings {
     float monitorVol = 0.8f;
     int  preset = 1;
     int  page = 0;
-    int  version = 2;
+    int  version = 3;
     bool autoStart = true;
     bool showVirtual = false;
     std::vector<std::wstring> mirrors;   // sorties en diffusion supplémentaire
@@ -29,11 +29,11 @@ inline std::wstring settingsPath() {
 
 #define VOX_PARAMS(X) \
     X(bypass) X(inputGainDb) X(hpfOn) X(hpfHz) X(denoiseOn) X(denoiseAmount) X(gateOn) X(gateThreshDb) X(gateRangeDb) \
-    X(gateReleaseMs) X(pitchOn) X(pitchSemis) X(eqOn) X(eqWarmthDb) X(eqMudDb) X(eqPresenceDb) X(eqAirDb) \
-    X(levelerOn) X(levelerTargetDb) X(compOn) X(compThreshDb) X(compRatio) X(compAttackMs) X(compReleaseMs) \
+    X(gateReleaseMs) X(pitchOn) X(pitchSemis) X(eqOn) \
+    X(levelerOn) X(levelerTargetDb) X(compOn) X(compStyle) X(compMix) X(mbOn) X(mbAmount) X(compThreshDb) X(compRatio) X(compAttackMs) X(compReleaseMs) \
     X(compMakeupDb) X(deessOn) X(deessFreqHz) X(deessThreshDb) X(deessMaxDb) X(exciterOn) X(exciterAmount) \
     X(satOn) X(satAmount) X(fxMode) X(fxMix) X(echoOn) X(echoTimeMs) X(echoFeedback) X(echoMix) \
-    X(reverbOn) X(reverbSize) X(reverbDamp) X(reverbMix) X(outputGainDb) X(limiterOn) X(limiterCeilDb)
+    X(reverbOn) X(reverbType) X(reverbSize) X(reverbDamp) X(reverbMix) X(outputGainDb) X(limiterOn) X(limiterCeilDb)
 
 inline void saveSettings(const Settings& s, const dsp::VoiceParams& p) {
     FILE* f = _wfopen(settingsPath().c_str(), L"wb");
@@ -48,6 +48,8 @@ inline void saveSettings(const Settings& s, const dsp::VoiceParams& p) {
 #define X(n) fprintf(f, "p." #n "=%g\n", (double)p.n.load());
     VOX_PARAMS(X)
 #undef X
+    for (int i = 0; i < dsp::kEqBands; ++i)
+        fprintf(f, "p.eq%d=%g,%g,%g\n", i, (double)p.eqF[i].load(), (double)p.eqG[i].load(), (double)p.eqQ[i].load());
     fclose(f);
 }
 
@@ -83,5 +85,10 @@ inline bool loadSettings(Settings& s, dsp::VoiceParams& p) {
 #define X(n) { auto it = kv.find("p." #n); if (it != kv.end()) p.n = (decltype(p.n.load()))atof(it->second.c_str()); }
     VOX_PARAMS(X)
 #undef X
+    for (int i = 0; i < dsp::kEqBands; ++i) {
+        auto it = kv.find("p.eq" + std::to_string(i));
+        float fr, g, q;
+        if (it != kv.end() && sscanf(it->second.c_str(), "%f,%f,%f", &fr, &g, &q) == 3) { p.eqF[i] = fr; p.eqG[i] = g; p.eqQ[i] = q; }
+    }
     return true;
 }

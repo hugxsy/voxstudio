@@ -1,5 +1,5 @@
 {
-  "version": "2.2.0",
-  "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio-2.2.0.exe",
-  "notes": "Nouveau logo. Bouton « Retour casque » dans la barre latérale pour couper ta voix dans le casque sans toucher aux autres sons, avec un fondu sans clic."
+  "version": "2.3.0",
+  "url": "https://raw.githubusercontent.com/hugxsy/voxstudio/main/release/VoxStudio-2.3.0.exe",
+  "notes": "Tranche voix pro : égaliseur visuel 5 bandes, compresseur VCA / Opto / FET avec dosage parallèle, densité radio 3 bandes, réverb Plate, saturation sans aliasing, limiteur à anticipation, preset C214 Radio."
 }

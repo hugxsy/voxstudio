@@ -505,6 +505,123 @@ static void pageTitle(const char* t, const char* sub) {
     ImGui::Dummy(ImVec2(0, S(10)));
 }
 
+// ------------------------------------------------------------ Éditeur de courbe d'égaliseur
+static float fToX(float f, float x0, float w) { return x0 + w * std::log(f / 20.0f) / std::log(1000.0f); }
+static float xToF(float x, float x0, float w) { return 20.0f * std::pow(1000.0f, std::clamp((x - x0) / w, 0.0f, 1.0f)); }
+
+static bool drawEqEditor(App& a, ImVec2 size) {
+    auto& p = a.engine.params;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    const float dbR = 15.0f;
+    auto dbToY = [&](float db) { return p0.y + size.y * 0.5f - db / dbR * size.y * 0.5f; };
+    auto yToDb = [&](float y) { return std::clamp((p0.y + size.y * 0.5f - y) / (size.y * 0.5f) * dbR, -dbR, dbR); };
+    bool changed = false;
+
+    dl->AddRectFilled(p0, ImVec2(p0.x + size.x, p0.y + size.y), U(ImVec4(0, 0, 0, 1)), S(12));
+    // spectre en fond
+    {
+        auto& sp = a.spec;
+        float bw = size.x / Spectrum::B;
+        for (int b = 0; b < Spectrum::B; ++b) {
+            float f0 = 60 * std::pow(16000.0f / 60, (float)b / Spectrum::B), f1 = 60 * std::pow(16000.0f / 60, (float)(b + 1) / Spectrum::B);
+            float x0 = fToX(f0, p0.x, size.x), x1 = fToX(f1, p0.x, size.x) - 1;
+            float h = sp.bands[b] * size.y * 0.85f;
+            if (h > 1) dl->AddRectFilled(ImVec2(x0, p0.y + size.y - h), ImVec2(x1, p0.y + size.y), U(col::text, 0.06f));
+            (void)bw;
+        }
+    }
+    // grille
+    ImGui::PushFont(fSmall);
+    for (float f : {50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f}) {
+        float x = fToX(f, p0.x, size.x);
+        dl->AddLine(ImVec2(x, p0.y), ImVec2(x, p0.y + size.y), U(col::line, 0.5f));
+        char lb[8]; snprintf(lb, sizeof lb, f >= 1000 ? "%.0fk" : "%.0f", f >= 1000 ? f / 1000 : f);
+        dl->AddText(ImVec2(x + S(4), p0.y + size.y - S(18)), U(col::text3), lb);
+    }
+    for (float db : {-12.0f, -6.0f, 0.0f, 6.0f, 12.0f}) {
+        float y = dbToY(db);
+        dl->AddLine(ImVec2(p0.x, y), ImVec2(p0.x + size.x, y), U(col::line, db == 0 ? 0.9f : 0.4f));
+        char lb[8]; snprintf(lb, sizeof lb, "%+.0f", db);
+        if (db != 0) dl->AddText(ImVec2(p0.x + S(6), y - S(16)), U(col::text3), lb);
+    }
+    ImGui::PopFont();
+
+    // courbe totale
+    dsp::Biquad bands[dsp::kEqBands], h1, h2;
+    for (int i = 0; i < dsp::kEqBands; ++i) dsp::buildEqBand(bands[i], i, p.eqF[i], p.eqG[i], p.eqQ[i]);
+    h1.highpass(p.hpfHz, 0.5412f); h2.highpass(p.hpfHz, 1.3066f);
+    bool eqOn = p.eqOn, hpfOn = p.hpfOn;
+    auto total = [&](float f) {
+        float db = 0;
+        if (eqOn) for (auto& b : bands) db += b.responseDb(f);
+        if (hpfOn) db += h1.responseDb(f) + h2.responseDb(f);
+        return std::clamp(db, -dbR - 3, dbR + 3);
+    };
+    std::vector<ImVec2> pts;
+    for (float x = 0; x <= size.x; x += S(3)) pts.push_back(ImVec2(p0.x + x, dbToY(total(xToF(p0.x + x, p0.x, size.x)))));
+    dl->PushClipRect(p0, ImVec2(p0.x + size.x, p0.y + size.y), true);
+    float y0 = dbToY(0);
+    for (size_t i = 1; i < pts.size(); ++i) {
+        ImVec2 a0 = pts[i - 1], a1 = pts[i];
+        dl->AddQuadFilled(ImVec2(a0.x, y0), a0, a1, ImVec2(a1.x, y0), U(col::orange, 0.13f));
+    }
+    dl->AddPolyline(pts.data(), (int)pts.size(), U(eqOn ? col::orange : col::text3), 0, S(2.5f));
+    dl->PopClipRect();
+
+    // poignées : 5 bandes + coupe-bas
+    static int drag = -1;
+    ImGui::InvisibleButton("##eqarea", size);
+    bool hovArea = ImGui::IsItemHovered();
+    ImVec2 mp = ImGui::GetIO().MousePos;
+    const int N = dsp::kEqBands + 1;
+    ImVec2 pos[N];
+    for (int i = 0; i < dsp::kEqBands; ++i) pos[i] = ImVec2(fToX(p.eqF[i], p0.x, size.x), dbToY(p.eqG[i]));
+    pos[N - 1] = ImVec2(fToX(p.hpfHz, p0.x, size.x), dbToY(total(p.hpfHz)));
+    int hov = -1; float best = S(16) * S(16);
+    for (int i = 0; i < N; ++i) { float dx = mp.x - pos[i].x, dy = mp.y - pos[i].y; if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; hov = i; } }
+    if (hovArea && hov >= 0) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    if (ImGui::IsItemActivated()) drag = hovArea ? hov : -1;
+    if (!ImGui::IsItemActive()) drag = -1;
+    if (drag >= 0) {
+        float f = xToF(mp.x, p0.x, size.x);
+        if (drag == N - 1) { p.hpfHz = std::clamp(f, 20.0f, 300.0f); }
+        else { p.eqF[drag] = std::clamp(f, 25.0f, 18000.0f); p.eqG[drag] = std::round(yToDb(mp.y) * 10) / 10; }
+        changed = true;
+    }
+    if (hovArea && hov >= 0 && hov < N - 1) {
+        ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);   // la molette règle la largeur sans faire défiler la page
+        float wheel = ImGui::GetIO().MouseWheel;
+        if (wheel != 0) { p.eqQ[hov] = std::clamp(p.eqQ[hov].load() * (wheel > 0 ? 1.15f : 1 / 1.15f), 0.2f, 8.0f); changed = true; }
+        if (ImGui::IsMouseDoubleClicked(0)) { p.eqG[hov] = 0; changed = true; }
+    }
+    const char* names[N] = {"Graves", "Bas-médium", "Médium", "Présence", "Aigus", "Coupe-bas"};
+    for (int i = 0; i < N; ++i) {
+        bool act = drag == i, hv = hov == i && hovArea;
+        float r = anim(ImGui::GetID(names[i]), (act || hv) ? S(10) : S(7.5f), 20);
+        bool isHpf = i == N - 1;
+        ImU32 ring = U(isHpf ? col::text2 : col::orange);
+        dl->AddCircleFilled(pos[i], r + S(2.5f), U(ImVec4(0, 0, 0, 1)), 24);
+        dl->AddCircleFilled(pos[i], r, (act || hv) ? ring : IM_COL32(255, 255, 255, 255), 24);
+        dl->AddCircle(pos[i], r, ring, 24, S(2));
+        if (act || hv) {
+            char t[64];
+            float fr = isHpf ? p.hpfHz.load() : p.eqF[i].load();
+            char fs[16]; if (fr >= 1000) snprintf(fs, sizeof fs, "%.1f kHz", fr / 1000); else snprintf(fs, sizeof fs, "%.0f Hz", fr);
+            if (isHpf) snprintf(t, sizeof t, "%s  ·  %s", names[i], fs);
+            else snprintf(t, sizeof t, "%s  ·  %s  ·  %+.1f dB  ·  largeur %.1f", names[i], fs, p.eqG[i].load(), p.eqQ[i].load());
+            ImGui::PushFont(fSmall);
+            ImVec2 ts = ImGui::CalcTextSize(t);
+            float tx = std::clamp(pos[i].x - ts.x / 2, p0.x + S(6), p0.x + size.x - ts.x - S(6));
+            float ty = pos[i].y - S(36) < p0.y ? pos[i].y + S(16) : pos[i].y - S(36);
+            dl->AddRectFilled(ImVec2(tx - S(8), ty - S(4)), ImVec2(tx + ts.x + S(8), ty + ts.y + S(4)), U(col::card2), S(8));
+            dl->AddText(ImVec2(tx, ty), U(col::text), t);
+            ImGui::PopFont();
+        }
+    }
+    return changed;
+}
+
 // ------------------------------------------------------------ Page Voix
 static void drawVoice(App& a) {
     auto& p = a.engine.params;
@@ -555,9 +672,26 @@ static void drawVoice(App& a) {
         if (Pill(dsp::presetName(i), a.st.preset == i)) { a.st.preset = i; dsp::applyPreset(p, (dsp::Preset)i); a.dirty = true; }
     }
     ImGui::Dummy(ImVec2(0, S(10)));
+    bool changed = false;
+
+    // --- Égaliseur visuel pleine largeur
+    beginCard("eqcard");
+    {
+        float cw2 = ImGui::GetContentRegionAvail().x;
+        ImVec2 hp = ImGui::GetCursorPos();
+        textCol(fMed, col::text, "Égaliseur");
+        textCol(fSmall, col::text2, "Glisse les points · molette sur un point = largeur · double-clic = remise à zéro");
+        ImVec2 after = ImGui::GetCursorPos();
+        ImGui::SetCursorPos(ImVec2(hp.x + cw2 - S(46), hp.y + S(4)));
+        changed |= SwitchA("##eqon", p.eqOn);
+        ImGui::SetCursorPos(after);
+        ImGui::Dummy(ImVec2(0, S(4)));
+        changed |= drawEqEditor(a, ImVec2(cw2, S(230)));
+    }
+    endCard();
+    ImGui::Dummy(ImVec2(0, S(6)));
 
     // --- Cartes d'effets sur 2 ou 3 colonnes
-    bool changed = false;
     int cols = W > S(1150) ? 3 : 2;
     float gap = S(14), cw = (W - gap * (cols - 1)) / cols;
     std::vector<std::function<void()>> cards;
@@ -578,23 +712,45 @@ static void drawVoice(App& a) {
         textCol(fSmall, open ? col::orange : col::text3, open ? "Ouvert" : "Fermé");
         ImGui::EndDisabled();
     });
-    add("eq", [&] {
-        cardHeader("Timbre", "La couleur de ta voix", &p.eqOn);
-        ImGui::BeginDisabled(!p.eqOn);
-        changed |= SlimA("Chaleur", p.eqWarmthDb, -6, 9, "%+.1f dB", 0);
-        changed |= SlimA("Désépaissir", p.eqMudDb, -9, 3, "%+.1f dB", 0);
-        changed |= SlimA("Présence", p.eqPresenceDb, -6, 9, "%+.1f dB", 0);
-        changed |= SlimA("Air", p.eqAirDb, -6, 9, "%+.1f dB", 0);
-        ImGui::EndDisabled();
-    });
     add("comp", [&] {
-        cardHeader("Compresseur", "Voix posée et dense, effet radio", &p.compOn);
+        cardHeader("Compresseur", "Voix posée et dense", &p.compOn);
         ImGui::BeginDisabled(!p.compOn);
+        const char* st[] = {"VCA", "Opto", "FET"};
+        const char* tips[] = {"Neutre et précis", "Doux et musical, façon LA-2A", "Rapide et agressif, façon 1176"};
+        float bw = (ImGui::GetContentRegionAvail().x - S(12)) / 3;
+        for (int i = 0; i < 3; ++i) {
+            if (i) ImGui::SameLine(0, S(6));
+            ImGui::PushID(i);
+            if (Pill(st[i], p.compStyle == i, ImVec2(bw, S(32)))) { p.compStyle = i; changed = true; }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tips[i]);
+            ImGui::PopID();
+        }
         changed |= SlimA("Seuil", p.compThreshDb, -50, 0, "%.0f dB", -24);
         changed |= SlimA("Intensité", p.compRatio, 1, 12, "%.1f : 1", 4);
+        ImGui::BeginDisabled(p.compStyle == dsp::CompOpto);
+        changed |= SlimA("Attaque", p.compAttackMs, 0.5f, 50, "%.1f ms", 5);
+        changed |= SlimA("Relâchement", p.compReleaseMs, 30, 400, "%.0f ms", 90);
+        ImGui::EndDisabled();
         changed |= SlimA("Volume ajouté", p.compMakeupDb, 0, 20, "%+.0f dB", 8);
+        float mx = p.compMix * 100;
+        if (Slim("Dosage (parallèle)", &mx, 0, 100, "%.0f %%", 100, -1, "En dessous de 100 %, la voix compressée est mélangée à la voix naturelle : dense mais vivante")) { p.compMix = mx / 100; changed = true; }
         textCol(fSmall, col::text3, "Réduction en cours");
         grBar(m.compGrDb, ImGui::GetContentRegionAvail().x);
+        ImGui::EndDisabled();
+    });
+    add("mb", [&] {
+        cardHeader("Densité radio", "Compresseur 3 bandes façon FM", &p.mbOn);
+        ImGui::BeginDisabled(!p.mbOn);
+        float v = p.mbAmount * 100;
+        if (Slim("Intensité", &v, 0, 100, "%.0f %%", 40)) { p.mbAmount = v / 100; changed = true; }
+        const char* bn[] = {"Graves", "Médiums", "Aigus"};
+        float w3 = ImGui::GetContentRegionAvail().x;
+        for (int k = 0; k < 3; ++k) {
+            ImGui::PushFont(fSmall); ImGui::TextColored(col::text3, "%s", bn[k]); ImGui::PopFont();
+            ImGui::SameLine(S(80));
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + S(7));
+            grBar(m.mbGr[k], w3 - S(80));
+        }
         ImGui::EndDisabled();
     });
     add("lev", [&] {
@@ -658,8 +814,18 @@ static void drawVoice(App& a) {
     add("rev", [&] {
         cardHeader("Réverb", "Ambiance de pièce ou de studio", &p.reverbOn);
         ImGui::BeginDisabled(!p.reverbOn);
+        {
+            const char* rt[] = {"Pièce", "Plate"};
+            float bw = (ImGui::GetContentRegionAvail().x - S(6)) / 2;
+            for (int i = 0; i < 2; ++i) {
+                if (i) ImGui::SameLine(0, S(6));
+                ImGui::PushID(100 + i);
+                if (Pill(rt[i], p.reverbType == i, ImVec2(bw, S(32)))) { p.reverbType = i; changed = true; }
+                ImGui::PopID();
+            }
+        }
         float sz = p.reverbSize * 100, dp = p.reverbDamp * 100, mx = p.reverbMix * 100;
-        if (Slim("Taille", &sz, 0, 100, "%.0f %%", 45)) { p.reverbSize = sz / 100; changed = true; }
+        if (Slim(p.reverbType == 1 ? "Durée" : "Taille", &sz, 0, 100, "%.0f %%", 45)) { p.reverbSize = sz / 100; changed = true; }
         if (Slim("Douceur", &dp, 0, 100, "%.0f %%", 50)) { p.reverbDamp = dp / 100; changed = true; }
         if (Slim("Dosage", &mx, 0, 60, "%.0f %%", 15)) { p.reverbMix = mx / 100; changed = true; }
         ImGui::EndDisabled();
@@ -1033,7 +1199,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int) {
 
     App app;
     bool had = loadSettings(app.st, app.engine.params);
-    if (!had || app.st.version < 2) { dsp::applyPreset(app.engine.params, dsp::Preset::Radio); app.st.preset = 1; app.st.version = 2; app.dirty = true; }
+    if (!had || app.st.version < 3) { dsp::applyPreset(app.engine.params, dsp::Preset::C214Radio); app.st.preset = 0; app.st.version = 3; app.dirty = true; }
     app.refreshDevices();
     app.autoPick();
     app.mixer.refresh();
